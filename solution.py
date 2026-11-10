@@ -1,5 +1,6 @@
 """Composition root; independent of HTTP or CLI."""
 import os
+import time
 from config import ROOT, load_env
 from dialogue import Dialogue
 from retrieval import Retriever
@@ -17,15 +18,32 @@ def build_service(db_path=None):
         get_api_config()  # Fail early for missing configuration.
 
     def answer(question, history):
+        started = time.perf_counter()
         documents = retriever.search(question, history)
         if not documents:
-            return 'В базе знаний не нашлось подходящей информации. Уточните вопрос или оставьте заявку менеджеру кнопкой «Связаться с менеджером».'
-        if mode == 'llm':
-            return generate_answer(question, documents, history)
-        # Explicit fallback, no pretending this is a model response.
-        return ('Демонстрационный режим без LLM. Найденные материалы:\n\n'
-                + '\n\n'.join(d['title'] + ': ' + d['text'] for d in documents)
-                + '\n\nДля обсуждения внедрения можно оставить заявку кнопкой «Связаться с менеджером».')
+            content = ('В предоставленной базе знаний нет ответа на этот вопрос. '
+                       'Уточните задачу или свяжитесь со специалистом кнопкой «Связаться с менеджером».')
+        elif mode == 'llm':
+            content = generate_answer(question, documents, history)
+        else:
+            # Explicit fallback, no pretending this is a model response.
+            content = ('Демонстрационный режим без LLM. Найденные материалы:\n\n'
+                       + '\n\n'.join(d['title'] + ': ' + d['text'] for d in documents)
+                       + '\n\nДля обсуждения внедрения можно оставить заявку кнопкой «Связаться с менеджером».')
+        return {
+            'content': content,
+            'debug': {
+                'elapsed_ms': round((time.perf_counter() - started) * 1000, 1),
+                'documents': [
+                    {
+                        'title': d.get('title', 'Без названия'),
+                        'score': d.get('score'),
+                        'excerpt': (d.get('text') or d.get('content') or '')[:300],
+                    }
+                    for d in documents
+                ],
+            },
+        }
 
     return Dialogue(Store(db_path or os.getenv('BOT_DB') or ROOT / 'runtime/bot.sqlite3'), answer)
 

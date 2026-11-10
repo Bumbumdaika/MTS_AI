@@ -2,6 +2,7 @@
 import json
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,10 +25,18 @@ class Store:
                     summary TEXT NOT NULL, created_at TEXT NOT NULL);
             ''')
 
+    @contextmanager
     def connect(self):
         db = sqlite3.connect(self.path, timeout=30)
         db.row_factory = sqlite3.Row
-        return db
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def create(self):
         state = dict(id=uuid.uuid4().hex, history=[], stage=None, fields={}, lead_id=None)
@@ -50,3 +59,21 @@ class Store:
                     VALUES (:id,:session_id,:full_name,:phone,:company,:summary,:created_at)''', lead)
             db.execute('INSERT OR REPLACE INTO sessions VALUES (?,?,?)',
                        (state['id'], json.dumps(state, ensure_ascii=False), now()))
+
+    def list_sessions(self, limit=50):
+        """Return recent sessions for the explicitly enabled local debug view."""
+        with self.connect() as db:
+            rows = db.execute(
+                'SELECT id,state,updated_at FROM sessions ORDER BY updated_at DESC LIMIT ?',
+                (max(1, min(int(limit), 200)),),
+            ).fetchall()
+        result = []
+        for row in rows:
+            state = json.loads(row['state'])
+            result.append({
+                'session_ref': row['id'][:8],
+                'updated_at': row['updated_at'],
+                'has_lead': bool(state.get('lead_id')),
+                'history': state.get('history', []),
+            })
+        return result

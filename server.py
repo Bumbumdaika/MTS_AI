@@ -14,7 +14,7 @@ def make_handler(service):
             pass  # Do not write session secrets or contact data to access logs.
 
         def respond(self, status, data, content_type='application/json; charset=utf-8'):
-            body = json.dumps(data, ensure_ascii=False).encode() if isinstance(data, dict) else data
+            body = json.dumps(data, ensure_ascii=False).encode() if isinstance(data, (dict, list)) else data
             self.send_response(status)
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(body)))
@@ -29,7 +29,16 @@ def make_handler(service):
             if path == '/':
                 return self.respond(200, (ROOT / 'web/index.html').read_bytes(), 'text/html; charset=utf-8')
             if path == '/api/health':
-                return self.respond(200, dict(status='ok', mode=os.getenv('BOT_MODE', 'demo')))
+                return self.respond(200, dict(
+                    status='ok',
+                    mode=os.getenv('BOT_MODE', 'demo'),
+                    debug_enabled=os.getenv('DEBUG_MODE', 'false').lower() in ('1', 'true', 'yes'),
+                ))
+            if path == '/api/debug/sessions':
+                if os.getenv('DEBUG_MODE', 'false').lower() not in ('1', 'true', 'yes'):
+                    return self.respond(404, dict(error='Режим отладки отключён.'))
+                limit = os.getenv('DEBUG_SESSION_LIMIT', '50')
+                return self.respond(200, service.store.list_sessions(limit))
             if path == '/api/session':
                 try:
                     session_id = self.session_id()
@@ -76,7 +85,7 @@ def make_handler(service):
 
 if __name__ == '__main__':
     service = build_service()
-    address = ('127.0.0.1', int(os.getenv('PORT', '8000')))
+    address = (os.getenv('HOST', '127.0.0.1'), int(os.getenv('PORT', '8000')))
     server = ThreadingHTTPServer(address, make_handler(service))
     print(f'Energytool: http://{address[0]}:{address[1]} — режим {os.getenv("BOT_MODE", "demo")}')
     try:

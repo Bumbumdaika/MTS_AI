@@ -1,0 +1,24 @@
+services:
+  energytool:
+    build: .
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+      BOT_MODE: ${BOT_MODE:-demo}
+      SEARCH_BACKEND: ${SEARCH_BACKEND:-basic}
+      DEBUG_MODE: ${DEBUG_MODE:-false}
+      DEBUG_SESSION_LIMIT: ${DEBUG_SESSION_LIMIT:-50}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-30}
+      MAX_TOKENS: ${MAX_TOKENS:-350}
+      TEMPERATURE: ${TEMPERATURE:-0.2}
+    volumes:
+      - energytool_runtime:/app/runtime
+    restart: unless-stopped
+
+volumes:
+  energytool_runtime:

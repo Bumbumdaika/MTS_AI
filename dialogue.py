@@ -76,7 +76,7 @@ class Dialogue:
                 question = text[5:].strip() if text.startswith('/ask ') else text
                 if not question:
                     raise ValueError('Введите вопрос после /ask.')
-                reply = self.answer(question, state['history'])
+                reply, debug = self._answer(question, state['history'])
                 if state['stage']:
                     reply += '\n\n' + (PROMPTS.get(state['stage']) or 'Для сохранения заявки нажмите «Подтвердить заявку».')
             elif state['stage'] == 'full_name':
@@ -116,10 +116,13 @@ class Dialogue:
                 reply = 'Заявка уже сохранена. Номер: ' + state['lead_id']
             else:
                 kind = 'consultation'
-                reply = self.answer(text, state['history'])
+                reply, debug = self._answer(text, state['history'])
+            assistant = dict(role='assistant', content=reply, kind=kind)
+            if kind == 'consultation' and debug:
+                assistant['debug'] = debug
             state['history'].extend([
                 dict(role='user', content=text, kind=kind),
-                dict(role='assistant', content=reply, kind=kind),
+                assistant,
             ])
             self.store.save(state, lead)
             return self.view(state)
@@ -129,3 +132,9 @@ class Dialogue:
         if not state['stage']:
             return False
         return '?' in text or bool(re.match(r'^(как|что|сколько|можно ли|расскажите|а какие|какие|зачем|почему)\b', text.lower()))
+
+    def _answer(self, question, history):
+        result = self.answer(question, history)
+        if isinstance(result, dict):
+            return str(result.get('content', '')), result.get('debug')
+        return str(result), None

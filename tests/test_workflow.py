@@ -13,6 +13,7 @@ from dialogue import Dialogue, phone_number
 from storage import Store
 from retrieval import Retriever
 from server import make_handler
+from solution import build_service
 import rag_generator
 
 
@@ -144,6 +145,22 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(retriever.search('Расскажите подробнее', history))
         self.assertEqual(retriever.search('zxqv123', []), [])
 
+    def test_answer_contains_debug_timing_and_documents(self):
+        path = Path(self.tmp.name) / 'debug.sqlite3'
+        with patch.dict('os.environ', {'BOT_MODE':'demo', 'SEARCH_BACKEND':'basic'}):
+            service = build_service(path)
+            state = service.new()
+            state = service.message(state['id'], 'Нужен мониторинг оборудования')
+        debug = state['history'][-1]['debug']
+        self.assertGreaterEqual(debug['elapsed_ms'], 0)
+        self.assertEqual(debug['documents'][0]['title'], 'Мониторинг оборудования')
+
+    def test_debug_session_listing(self):
+        self.send('Мониторинг оборудования')
+        sessions = self.bot.store.list_sessions()
+        self.assertEqual(sessions[0]['session_ref'], self.sid[:8])
+        self.assertEqual(len(sessions[0]['history']), 2)
+
     def test_llm_receives_only_consultation_history(self):
         class Response:
             def __enter__(self): return self
@@ -176,6 +193,9 @@ class WorkflowTests(unittest.TestCase):
             req = urllib.request.Request(url+'/api/chat', data=b'{}', headers={**headers,'Origin':'https://other.invalid'})
             with self.assertRaises(urllib.error.HTTPError) as error: urllib.request.urlopen(req)
             self.assertEqual(error.exception.code, 403)
+            with patch.dict('os.environ', {'DEBUG_MODE':'true'}):
+                with urllib.request.urlopen(url+'/api/debug/sessions') as r:
+                    self.assertIsInstance(json.load(r), list)
         finally:
             server.shutdown(); server.server_close(); thread.join()
 

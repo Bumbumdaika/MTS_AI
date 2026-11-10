@@ -1,0 +1,4 @@
+FlagEmbedding
+numpy
+scikit-learn
+faiss-cpu

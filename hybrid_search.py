@@ -7,9 +7,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 from FlagEmbedding import BGEM3FlagModel
 
 
-DATA_PATH = Path("data/knowledge.json")
-EMBEDDINGS_PATH = Path("indexes/document_embeddings.npy")
-DOCUMENTS_PATH = Path("indexes/documents.json")
+BASE_DIR = Path(__file__).resolve().parent
+DATA_PATH = BASE_DIR / "data/knowledge.json"
+EMBEDDINGS_PATH = BASE_DIR / "indexes/document_embeddings.npy"
+DOCUMENTS_PATH = BASE_DIR / "indexes/documents.json"
 
 with open(DATA_PATH, "r", encoding="utf-8") as file:
     documents = json.load(file)
@@ -118,31 +119,32 @@ def hybrid_search(query, top_k=2, rrf_k=60):
 
     return results
 
-print("Введи вопрос или 0 для выхода.\n")
+if __name__ == "__main__":
+    print("Введи вопрос или 0 для выхода.\n")
 
-while True:
-    query = input("Твой вопрос: ").strip()
+    while True:
+        query = input("Твой вопрос: ").strip()
 
-    if query.lower() == "0":
-        print("Поиск завершён.")
-        break
+        if query.lower() == "0":
+            print("Поиск завершён.")
+            break
 
-    if not query:
-        print("Введи вопрос.")
-        continue
+        if not query:
+            print("Введи вопрос.")
+            continue
 
-    try:
-        results = hybrid_search(query)
+        try:
+            results = hybrid_search(query)
 
-        print("\nЛучшие результаты:\n")
+            print("\nЛучшие результаты:\n")
 
-        for i, result in enumerate(results, start=1):
-            print(f"{i}. {result['title']}")
-            print(f"BGE-M3: {result['semantic_score']:.4f}")
-            print(f"TF-IDF: {result['tfidf_score']:.4f}")
-            print(f"RRF: {result['rrf_score']:.4f}")
-            print(result["text"])
-            print()
+            for i, result in enumerate(results, start=1):
+                print(f"{i}. {result['title']}")
+                print(f"BGE-M3: {result['semantic_score']:.4f}")
+                print(f"TF-IDF: {result['tfidf_score']:.4f}")
+                print(f"RRF: {result['rrf_score']:.4f}")
+                print(result["text"])
+                print()
 
-    except Exception as error:
-        print(f"Ошибка поиска: {error}")
+        except Exception as error:
+            print(f"Ошибка поиска: {error}")
